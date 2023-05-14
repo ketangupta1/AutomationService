@@ -1,0 +1,2 @@
+# AutomationService
+Automate Trading 
