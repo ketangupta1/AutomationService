@@ -32,9 +32,7 @@ func main() {
 
 	//// Create New Angel Broking Client
 	ABClient := SmartApi.New(clientCode, password, marketKey)
-	//
-	//fmt.Println("Client :- ", ABClient)
-	//
+
 	//User Login and Generate User Session
 	if accessToken == "" {
 		session, err := ABClient.GenerateSession(totp)
