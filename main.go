@@ -149,8 +149,8 @@ func main() {
 }
 
 func setEnv(session smartapi.UserSession) {
-	os.Setenv("ACCESS_TOKEN", session.AccessToken)a
-	os.Setenv("FEED_TOKEN", session.FeedToken)s
+	os.Setenv("ACCESS_TOKEN", session.AccessToken)
+	os.Setenv("FEED_TOKEN", session.FeedToken)
 	os.Setenv("REFRESH_TOKEN", session.RefreshToken)
 
 	feedToken = session.FeedToken
