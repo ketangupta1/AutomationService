@@ -7,9 +7,8 @@ import (
 )
 
 var (
-	ltpClient *smartstream.WebSocket
-	currTime  = time.Now()
-	baseTime  = time.Date(currTime.Year(), currTime.Month(), currTime.Day(), 9, 0, 0, 0, time.Local)
+	currTime = time.Now()
+	baseTime = time.Date(currTime.Year(), currTime.Month(), currTime.Day(), 9, 0, 0, 0, time.Local)
 )
 
 type ltp struct {

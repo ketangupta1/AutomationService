@@ -44,12 +44,11 @@ func main() {
 
 	setEnv(session)
 
-	someAlgo := strategy.New()
-
 	wg := sync.WaitGroup{}
 
 	client := smartStream.New(clientCode, feedToken)
 	history := historyData.New(apiClient)
+	someAlgo := strategy.New(history)
 
 	go func() {
 		wg.Add(1)
@@ -57,7 +56,7 @@ func main() {
 		client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, "2885")
 	}()
 
-	go someAlgo.Algo(false)
+	go someAlgo.Algo()
 
 	////
 	////////Renew User Tokens using refresh token
@@ -150,8 +149,8 @@ func main() {
 }
 
 func setEnv(session smartapi.UserSession) {
-	os.Setenv("ACCESS_TOKEN", session.AccessToken)
-	os.Setenv("FEED_TOKEN", session.FeedToken)
+	os.Setenv("ACCESS_TOKEN", session.AccessToken)a
+	os.Setenv("FEED_TOKEN", session.FeedToken)s
 	os.Setenv("REFRESH_TOKEN", session.RefreshToken)
 
 	feedToken = session.FeedToken
