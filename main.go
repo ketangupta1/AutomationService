@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	simulation "github.com/TredingInGo/AutomationService/Simulation"
 	"github.com/TredingInGo/AutomationService/historyData"
 	"github.com/TredingInGo/AutomationService/smartStream"
-	"github.com/TredingInGo/AutomationService/strategy"
-	"github.com/TredingInGo/smartapi/models"
 	"os"
 	"sync"
 
@@ -17,7 +16,7 @@ const (
 	password   = "4926"
 	apiKey     = "MN9K2rhC"
 	marketKey  = "XDnby4up"
-	totp       = "568096"
+	totp       = "938667"
 )
 
 var (
@@ -48,15 +47,16 @@ func main() {
 
 	client := smartStream.New(clientCode, feedToken)
 	history := historyData.New(apiClient)
-	someAlgo := strategy.New(history)
-
-	go func() {
-		wg.Add(1)
-		defer wg.Done()
-		client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, "2885")
-	}()
-
-	go someAlgo.Algo()
+	//someAlgo := strategy.New(history)
+	_ = client
+	//go func() {
+	//	wg.Add(1)
+	//	defer wg.Done()
+	//	client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, "2885")
+	//}()
+	db := simulation.Connect()
+	simulation.PrepareData(db, apiClient)
+	//go someAlgo.Algo()
 
 	////
 	////////Renew User Tokens using refresh token
@@ -137,7 +137,7 @@ func main() {
 		SymbolToken: "3045",
 		Interval:    "FIVE_MINUTE",
 		FromDate:    "2023-02-10 09:15",
-		ToDate:      "2023-02-10 09:21",
+		ToDate:      "2023-01-10 09:21",
 	})
 	if err != nil {
 		fmt.Println(err.Error())
