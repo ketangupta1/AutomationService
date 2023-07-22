@@ -13,7 +13,7 @@ func PrepareData(db *sql.DB, client *smartapigo.Client) {
 	symbolToken := 2885
 	tempTime := time.Now()
 	historyData := make([]smartapigo.CandleResponse, 0)
-	for j := 0; j < 5; j++ {
+	for j := 0; j < 730; j++ {
 		toDate := tempTime.Format("2006-01-02 15:04")
 		fromDate := tempTime.Add(time.Hour * 24 * -5).Format("2006-01-02 15:04")
 		tempTime = tempTime.Add(time.Hour * 24 * -5)
