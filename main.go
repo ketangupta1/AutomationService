@@ -16,7 +16,7 @@ const (
 	password   = "4926"
 	apiKey     = "MN9K2rhC"
 	marketKey  = "XDnby4up"
-	totp       = "923640"
+	totp       = "874294"
 )
 
 var (
@@ -55,8 +55,8 @@ func main() {
 	//	client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, "2885")
 	//}()
 	db := simulation.Connect()
-	simulation.PrepareData(db, apiClient)
-	//simulation.DoBackTest(db)
+	//simulation.PrepareData(db, apiClient)
+	simulation.DoBackTest(db)
 	//go someAlgo.Algo()
 
 	////
