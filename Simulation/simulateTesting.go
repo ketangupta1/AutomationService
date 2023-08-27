@@ -1,0 +1,154 @@
+package Simulation
+
+import (
+	"fmt"
+	"math"
+	"time"
+)
+
+func PlaceBuyOrder(ohlcData []OHLC, index int, sl, takeProfit, buyPrice float64) {
+
+	// Loop from the current index + 1 to the end of the OHLC data
+	totalTrade++
+	positionSize := int64(calculatePositionSize(buyPrice, sl))
+	fmt.Printf("PostionSize: %v", positionSize)
+	// When entering a trade, append the trade record with entry information
+	trades = append(trades, tradeRecord{entryTimestamp: ohlcData[index].Timestamp, entryPrice: sl, profit: false})
+
+	for i := index + 1; i < len(ohlcData); i++ {
+		if ohlcData[i].Low <= sl {
+			// Stop Loss triggered, calculate loss
+			loss := (sl - buyPrice) * float64(positionSize) * 5
+			lossCount++
+			amount += loss
+			fmt.Printf("Trade result: Loss %.2f\n", loss)
+			// When exiting a trade, update the exit information
+			minAmount = math.Min(minAmount, amount)
+			trade = append(trade, tradeReport{amount, 0.0, loss, "breakOut", buyPrice, takeProfit, sl})
+			return
+		} else if ohlcData[i].High >= takeProfit {
+			// Take Profit triggered, calculate profit
+			profit := (takeProfit - buyPrice) * float64(positionSize) * 5
+			profitCount++
+			amount += profit
+			maxAmount = math.Max(maxAmount, amount)
+			tp := (buyPrice - sl) + buyPrice
+			trades[len(trades)-1].exitTimestamp = ohlcData[i].Timestamp
+			trades[len(trades)-1].exitPrice = tp
+			trade = append(trade, tradeReport{amount, profit, 0.0, "breakOut", buyPrice, takeProfit, sl})
+			fmt.Printf("Trade result: Profit %.2f\n", profit)
+			return
+		} else {
+			// when time is 3:00 PM square of positions
+			tradeTime, err := time.Parse("2006-01-02 15:04:05-07:00", ohlcData[index].Timestamp)
+			if err != nil {
+				fmt.Println("Error parsing timestamp:", err)
+				return
+			}
+
+			if tradeTime.Hour() == 15 && tradeTime.Minute() == 0 {
+				profit := (ohlcData[i].Close - buyPrice) * 5
+				amount += profit
+				if profit > 0 {
+					trade = append(trade, tradeReport{amount, profit, 0.0, "breakOut", buyPrice, takeProfit, sl})
+					profitCount++
+				} else {
+					trade = append(trade, tradeReport{amount, 0.0, profit, "breakOut", buyPrice, takeProfit, sl})
+					lossCount++
+				}
+				maxAmount = math.Max(maxAmount, amount)
+				minAmount = math.Min(minAmount, amount)
+				return
+				// Perform your square-off logic here...
+			}
+		}
+	}
+
+	// If the loop completes without hitting Stop Loss or Take Profit
+	fmt.Println("Trade result: No Stop Loss or Take Profit triggered.")
+
+	// If the loop completes without hitting Stop Loss or Take Profit
+	return
+}
+
+func PlaceSellOrder(ohlcData []OHLC, index int, sl, takeProfit, sellPrice float64) {
+
+	// Loop from the current index + 1 to the end of the OHLC data
+	totalTrade++
+	positionSize := int64(calculatePositionSize(sellPrice, sl))
+	fmt.Printf("PositionSize: %v\n", positionSize)
+	// When entering a trade, append the trade record with entry information
+	trades = append(trades, tradeRecord{entryTimestamp: ohlcData[index].Timestamp, entryPrice: sl, profit: false})
+
+	for i := index + 1; i < len(ohlcData); i++ {
+		if ohlcData[i].High >= sl {
+			// Stop Loss triggered, calculate loss
+			loss := (sellPrice - sl) * float64(positionSize) * 5
+			lossCount++
+			amount += loss
+			fmt.Printf("Trade result: Loss %.2f\n", loss)
+			// When exiting a trade, update the exit information
+			tp := (sl - sellPrice) + sellPrice
+			trades[len(trades)-1].exitTimestamp = ohlcData[i].Timestamp
+			trades[len(trades)-1].exitPrice = tp
+			trade = append(trade, tradeReport{amount, 0.0, loss, "breakOut", ohlcData[i].High, takeProfit, sl})
+
+			minAmount = math.Min(minAmount, amount)
+
+			return
+		} else if ohlcData[i].Low <= takeProfit {
+			// Take Profit triggered, calculate profit
+			profit := (sellPrice - takeProfit) * float64(positionSize) * 5
+			profitCount++
+			amount += profit
+			maxAmount = math.Max(maxAmount, amount)
+			tp := (sl - sellPrice) + sellPrice
+			trades[len(trades)-1].exitTimestamp = ohlcData[i].Timestamp
+			trades[len(trades)-1].exitPrice = tp
+			trade = append(trade, tradeReport{amount, profit, 0.0, "breakOut", ohlcData[i].High, takeProfit, sl})
+			fmt.Printf("Trade result: Profit %.2f\n", profit)
+			return
+		} else {
+			// when time is 3:00 PM square of positions
+			tradeTime, err := time.Parse("2006-01-02 15:04:05-07:00", ohlcData[index].Timestamp)
+			if err != nil {
+				fmt.Println("Error parsing timestamp:", err)
+				return
+			}
+
+			if tradeTime.Hour() == 15 && tradeTime.Minute() == 0 {
+				profit := (sellPrice - ohlcData[i].Close) * 5
+				amount += profit
+				if profit > 0 {
+					trade = append(trade, tradeReport{amount, profit, 0.0, "breakOut", ohlcData[i].High, takeProfit, sl})
+					profitCount++
+				} else {
+					trade = append(trade, tradeReport{amount, 0.0, profit, "breakOut", ohlcData[i].High, takeProfit, sl})
+					lossCount++
+				}
+				maxAmount = math.Max(maxAmount, amount)
+				minAmount = math.Min(minAmount, amount)
+				return
+				// Perform your square-off logic here...
+			}
+		}
+	}
+
+	// If the loop completes without hitting Stop Loss or Take Profit
+	fmt.Println("Trade result: No Stop Loss or Take Profit triggered.")
+}
+
+func calculatePositionSize(buyPrice, sl float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	maxRiskPercent := 0.05 // 2% maximum risk allowed
+	maxRiskAmount := amount * maxRiskPercent
+	riskPerShare := math.Max(1, buyPrice-sl)
+	positionSize := maxRiskAmount / riskPerShare
+	for positionSize*maxRiskAmount > amount {
+		positionSize--
+	}
+
+	return positionSize
+}
