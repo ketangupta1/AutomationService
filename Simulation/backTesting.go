@@ -60,7 +60,7 @@ var trade []tradeReport
 
 func DoBackTest(db *sql.DB) {
 
-	ohlcData := getData(db)
+	ohlcData := GetData(db)
 	//for i := 24; i < 100; i++ {
 	//	for j := 20; j < i; j++ {
 	//		for k := 32; k < 90; k++ {
@@ -74,7 +74,7 @@ func DoBackTest(db *sql.DB) {
 	saveTradeReport(trade, db)
 }
 
-func getData(db *sql.DB) []OHLC {
+func GetData(db *sql.DB) []OHLC {
 	rows, err := db.Query(`SELECT * FROM "History"."OHLCData" WHERE id = 2885 AND timeframeinseconds = 900  order by timestamp limit 30000`)
 	if err != nil {
 		log.Fatalf("Error querying data from the table: %v", err)
