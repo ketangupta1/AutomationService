@@ -3,7 +3,7 @@ module github.com/TredingInGo/AutomationService
 go 1.17
 
 require (
-	github.com/TredingInGo/smartapi v0.0.0-20230610093206-279a72a5680e
+	github.com/TredingInGo/smartapi v0.0.0-20230827122040-0d7216137bde
 	github.com/lib/pq v1.10.9
 	github.com/wcharczuk/go-chart v2.0.1+incompatible
 )

@@ -3,16 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	simulation "github.com/TredingInGo/AutomationService/Simulation"
 	"github.com/TredingInGo/AutomationService/historyData"
 	"github.com/TredingInGo/AutomationService/smartStream"
+	"github.com/TredingInGo/AutomationService/strategy"
+	smartapi "github.com/TredingInGo/smartapi"
+	"github.com/TredingInGo/smartapi/models"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sync"
-
-	smartapi "github.com/TredingInGo/smartapi"
 )
 
 const (
@@ -27,6 +26,7 @@ var (
 	accessToken, feedToken, refreshToken string
 	apiClient                            *smartapi.Client
 	session                              smartapi.UserSession
+	err                                  error
 )
 
 func init() {
@@ -36,6 +36,10 @@ func init() {
 }
 
 func main() {
+	defer func() {
+		recover()
+	}()
+
 	r := mux.NewRouter()
 
 	r.HandleFunc("/session", func(writer http.ResponseWriter, request *http.Request) {
@@ -52,106 +56,100 @@ func main() {
 			fmt.Println(err.Error())
 			return
 		}
+
+		fmt.Println("User Session Tokens :- ", session.UserSessionTokens)
+		setEnv(session)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
 		history := historyData.New(apiClient)
-		param := smartapi.CandleParams{}
-		body, _ := ioutil.ReadAll(request.Body)
+		params := request.URL.Query()
 
-		json.Unmarshal(body, &param)
-
-		data, err := history.GetCandle(param)
+		data, err := history.GetCandle(smartapi.CandleParams{
+			Exchange:    params.Get("exchange"),
+			SymbolToken: params.Get("symbolToken"),
+			Interval:    params.Get("interval"),
+			FromDate:    params.Get("fromDate"),
+			ToDate:      params.Get("toDate"),
+		})
 		if err != nil {
 			fmt.Println(err.Error())
 		}
 
 		fmt.Println(data)
+
+		b, _ := json.Marshal(data)
+		writer.Write(b)
+		writer.WriteHeader(200)
 	}).Methods(http.MethodGet)
 
-	setEnv(session)
+	r.HandleFunc("/startStream", func(writer http.ResponseWriter, request *http.Request) {
+		if session.FeedToken == "" {
+			fmt.Println("feed token not set")
+			return
+		}
 
-	wg := sync.WaitGroup{}
+		body, _ := ioutil.ReadAll(request.Body)
+		var param = make(map[string]string)
+		json.Unmarshal(body, &param)
 
-	client := smartStream.New(clientCode, feedToken)
+		history := historyData.New(apiClient)
+		someAlgo := strategy.New(history)
+		client := smartStream.New(clientCode, feedToken)
+		go client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, param["token"])
 
-	//someAlgo := strategy.New(history)
-	_ = client
-	//go func() {
-	//	wg.Add(1)
-	//	defer wg.Done()
-	//	client.Connect(someAlgo.LiveData, models.LTP, models.NSECM, "2885")
-	//}()
-	db := simulation.Connect()
-	_ = db
-	//simulation.PrepareData(db, apiClient)
-	//	simulation.DoBackTest(db)
-	//go someAlgo.Algo()
+		go someAlgo.Algo()
 
-	////
-	////////Renew User Tokens using refresh token
-	//////session.UserSessionTokens, err = ABClient.RenewAccessToken(session.RefreshToken)
-	//////
-	//////if err != nil {
-	//////	fmt.Println(err.Error())
-	//////	return
-	//////}
-	////
-	////fmt.Println("User Session Tokens :- ", session.UserSessionTokens)
-	//
-	////Get User Profile
-	////session.UserProfile, err = ABClient.GetUserProfile()
-	//
-	////if err != nil {
-	////	fmt.Println(err.Error())
-	////	return
-	////}
-	//
-	////fmt.Println("User Profile :- ", session.UserProfile)
-	////fmt.Println("User Session Object :- ", session)
-	//
-	//////Place Order
-	////order, err := ABClient.PlaceOrder(SmartApi.OrderParams{Variety: "NORMAL", TradingSymbol: "SBIN-EQ", SymbolToken: "3045", TransactionType: "BUY", Exchange: "NSE", OrderType: "LIMIT", ProductType: "INTRADAY", Duration: "DAY", Price: "19500", SquareOff: "0", StopLoss: "0", Quantity: "1"})
-	////
-	////if err != nil {
-	////	fmt.Println(err.Error())
-	////	return
-	////}
-	//
-	////	fmt.Println("Placed Order ID and Script :- ", order)
-	//
-	///*
-	//		  "exchange": "NSE",
-	//	     "symboltoken": "3045",
-	//	     "interval": "ONE_MINUTE",
-	//	     "fromdate": "2021-02-10 09:15",
-	//	     "todate": "2021-02-10 09:16"
-	//*/
-	//
+	}).Methods(http.MethodPost)
 
-	//data, err := history.GetCandle(smartapi.CandleParams{
-	//	Exchange:    "NSE",
-	//	SymbolToken: "3045",
-	//	Interval:    "ONE_MINUTE",
-	//	FromDate:    "2021-02-10 09:15",
-	//	ToDate:      "2021-02-10 09:16",
-	//})
-	//
-	//
-	//data, err = history.GetCandle(smartapi.CandleParams{
-	//	Exchange:    "NSE",
-	//	SymbolToken: "3045",
-	//	Interval:    "FIVE_MINUTE",
-	//	FromDate:    "2023-02-10 09:15",
-	//	ToDate:      "2023-01-10 09:21",
-	//})
-	//if err != nil {
-	//	fmt.Println(err.Error())
-	//}
-	////
-	//fmt.Println(data)
+	r.HandleFunc("/renew", func(writer http.ResponseWriter, request *http.Request) {
+		//Renew User Tokens using refresh token
+		session.UserSessionTokens, err = apiClient.RenewAccessToken(session.RefreshToken)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 
-	wg.Wait()
+		fmt.Println("User Session Tokens :- ", session.UserSessionTokens)
+	}).Methods(http.MethodGet)
+
+	r.HandleFunc("/profile", func(writer http.ResponseWriter, request *http.Request) {
+		// Get User Profile
+		session.UserProfile, err = apiClient.GetUserProfile()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		fmt.Println("User Profile :- ", session.UserProfile)
+		fmt.Println("User Session Object :- ", session)
+
+	})
+
+	r.HandleFunc("/order", func(writer http.ResponseWriter, request *http.Request) {
+		//Place Order
+		order, err := apiClient.PlaceOrder(smartapi.OrderParams{
+			Variety:         "NORMAL",
+			TradingSymbol:   "SBIN-EQ",
+			SymbolToken:     "3045",
+			TransactionType: "BUY",
+			Exchange:        "NSE",
+			OrderType:       "LIMIT",
+			ProductType:     "INTRADAY",
+			Duration:        "DAY",
+			Price:           "19500",
+			SquareOff:       "0",
+			StopLoss:        "0",
+			Quantity:        "1",
+		})
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		fmt.Println("Placed Order ID and Script :- ", order)
+	})
 
 	http.ListenAndServe(":8000", r)
 }
