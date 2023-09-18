@@ -70,6 +70,7 @@ func DoBackTest(db *sql.DB) {
 	//	}
 	//
 	//}
+	
 	breakoutStretgy(ohlcData)
 	saveTradeReport(trade, db)
 }
@@ -145,7 +146,7 @@ func executetest(ohlcData []OHLC, smaLow int, smaHigh int, rsiPeriod int, db *sq
 			sl := ohlcData[i-1].Low
 			bp := ohlcData[i].Close
 			tp := (bp - sl) + bp
-			PlaceBuyOrder(ohlcData, i, sl, tp, bp)
+			//PlaceBuyOrder(ohlcData, i, sl, tp, bp)
 			fmt.Printf("Buy at %.2f, SL at %.2f, TP at %.2f\n", ohlcData[i].Close, sl, tp)
 		}
 	}
@@ -200,33 +201,25 @@ func breakoutStretgy(data []OHLC) {
 	lossCount = 0
 
 	high, low := calculateLowHigh(data, 4)
+	Totaldays := len(data) / 25
+	for day := Totaldays / 2; day <= Totaldays; day++ {
+		high, low = calculateLowHigh(data, (day-1)*25)
+		index := (day-1)*25 + 1
 
-	for i := 4; i < len(data); i++ {
-		// buying logic
-		if amount <= 0 {
-			return
-		}
-		if i%24 == 0 && i+4 < len(data) {
-			high, low = calculateLowHigh(data, i+4)
-		}
-		weag := calculateWeightedPercentage(data[i])
+		doExecute(data, index, low, high)
 
-		if data[i].Close > high && data[i].Close < data[i].Open && weag < 17 {
-			triggerBuyOrder(data, data[i], i, high)
-		} else if data[i].Close < high && data[i].Close > data[i].Open && weag < 17 {
-			triggerSellOrder(data, data[i], i, low)
-		}
 	}
 }
 
 func calculateLowHigh(data []OHLC, index int) (high float64, low float64) {
-	high = 0.0
-	low = 100000.0
-	for it := index - 1; it >= index-4; it-- {
-		high = math.Max(high, data[it].High)
-		low = math.Min(low, data[it].Low)
-	}
-	return high, low
+	return data[index].High, data[index].Low
+	//high = 0.0
+	//low = 100000.0
+	//for it := index - 1; it >= index-4; it-- {
+	//	high = math.Max(high, data[it].High)
+	//	low = math.Min(low, data[it].Low)
+	//}
+	//return high, low
 }
 
 func calculateWeightedPercentage(candle OHLC) float64 {
@@ -235,15 +228,13 @@ func calculateWeightedPercentage(candle OHLC) float64 {
 	weightedPercentage := (weightedClose * 100) / weightedHigh
 	return weightedPercentage
 }
-func triggerBuyOrder(data []OHLC, candle OHLC, index int, high float64) {
-	for i := index; i < len(data); i++ {
-		if data[i].Low < high {
-			return
-		}
+func triggerBuyOrder(data []OHLC, candle OHLC, index int, high float64, length int) int {
+	for i := index; i < length; i++ {
 		if data[i].High >= candle.High {
-			PlaceBuyOrder(data, i, candle.Low, data[i].High+2*(data[i].High-candle.Low), data[i].High)
+			return PlaceBuyOrder(data, i, candle.High, candle.Low, data[i].High, length)
 		}
 	}
+	return length
 }
 
 func triggerSellOrder(data []OHLC, candle OHLC, index int, low float64) {
@@ -278,5 +269,18 @@ func saveTradeReport(trades []tradeReport, db *sql.DB) {
 		}
 
 		//fmt.Printf("Inserted row with ID: %d\n", insertedID)
+	}
+}
+
+func doExecute(data []OHLC, index int, low, high float64) {
+	it := index
+	for i := it; i < index+24; i++ {
+		// buying logic
+		if amount <= 0 {
+			return
+		}
+		if data[i].High > high && data[i-1].Low < high && data[i].Close < data[i].Open {
+			i = triggerBuyOrder(data, data[i], i, high, index+24)
+		}
 	}
 }
