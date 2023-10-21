@@ -91,8 +91,8 @@ func onSnapquote(snapquote models.SnapQuote) {
 	log.Printf("%d", snapquote.BestFiveSell[0])
 }
 
-func onLTP(chForCandle chan *models.LTPInfo) func(ltpInfo models.LTPInfo) {
-	return func(ltpInfo models.LTPInfo) {
+func onLTP(chForCandle chan *models.SnapQuote) func(ltpInfo models.SnapQuote) {
+	return func(ltpInfo models.SnapQuote) {
 		log.Println(ltpInfo)
 		chForCandle <- &ltpInfo
 	}

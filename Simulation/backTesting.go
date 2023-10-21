@@ -70,7 +70,7 @@ func DoBackTest(db *sql.DB) {
 	//	}
 	//
 	//}
-	
+
 	breakoutStretgy(ohlcData)
 	saveTradeReport(trade, db)
 }

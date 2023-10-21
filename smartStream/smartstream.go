@@ -19,8 +19,8 @@ func New(clientCode, feedToken string) ltp {
 	return ltp{client: smartstream.New(clientCode, feedToken)}
 }
 
-func (l ltp) Connect(ch chan *models.LTPInfo, mode models.SmartStreamSubsMode, exchangeType models.ExchangeType, token string) {
+func (l ltp) Connect(ch chan *models.SnapQuote, mode models.SmartStreamSubsMode, exchangeType models.ExchangeType, token string) {
 	l.client.SetOnConnected(onConnected(l.client, mode, exchangeType, token))
-	l.client.SetOnLTP(onLTP(ch))
+	l.client.SetOnSnapquote(onLTP(ch))
 	l.client.Connect()
 }
