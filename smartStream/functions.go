@@ -93,7 +93,7 @@ func onSnapquote(snapquote models.SnapQuote) {
 
 func onLTP(chForCandle chan *models.SnapQuote) func(ltpInfo models.SnapQuote) {
 	return func(ltpInfo models.SnapQuote) {
-		log.Println(ltpInfo)
+		//log.Println(ltpInfo)
 		chForCandle <- &ltpInfo
 	}
 }

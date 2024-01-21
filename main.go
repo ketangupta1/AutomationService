@@ -91,16 +91,18 @@ func main() {
 		}
 
 		body, _ := ioutil.ReadAll(request.Body)
-		strategy.PopuletInstrumentsList()
+		//strategy.PopuletInstrumentsList()
 		var param = make(map[string]string)
 		json.Unmarshal(body, &param)
 		db := Simulation.Connect()
 		history := historyData.New(apiClient)
 		someAlgo := strategy.New(history, db)
 		client := smartStream.New(clientCode, feedToken)
-		filteredStocks := someAlgo.FilterStocks("NSE")
-		token := strategy.GetToken(filteredStocks[len(filteredStocks)-1], "NSE")
-		//token := "294"
+		//Simulation.CollectData(db, apiClient)
+		strategy.TrendFollowingStretgy(apiClient, db)
+		//filteredStocks := someAlgo.FilterStocks("NSE")
+		//token := strategy.GetToken(filteredStocks[len(filteredStocks)-1], "NSE")
+		token := "15083"
 		strategy.Init(token)
 		go client.Connect(someAlgo.LiveData, models.SNAPQUOTE, models.NSECM, token)
 		go someAlgo.Algo(token)

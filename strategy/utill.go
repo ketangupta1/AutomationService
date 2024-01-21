@@ -1,10 +1,16 @@
 package strategy
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	smartapigo "github.com/TredingInGo/smartapi"
 	"github.com/TredingInGo/smartapi/models"
+	"io/ioutil"
+	"math"
+	"net/http"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -36,6 +42,21 @@ func GetClosePriceArray(data []smartapigo.CandleResponse) []float64 {
 	}
 	return closePrice
 }
+func GetHighPriceArray(data []smartapigo.CandleResponse) []float64 {
+	var highPrice []float64
+	for i := 0; i < len(data); i++ {
+		highPrice = append(highPrice, data[i].High)
+	}
+	return highPrice
+}
+
+func GetLowPriceArray(data []smartapigo.CandleResponse) []float64 {
+	var lowPrice []float64
+	for i := 0; i < len(data); i++ {
+		lowPrice = append(lowPrice, data[i].Low)
+	}
+	return lowPrice
+}
 
 func GetVolumeArray(data []smartapigo.CandleResponse) []float64 {
 	var volume []float64
@@ -58,10 +79,10 @@ func (s strategy) FilterStocks(exchange string) []string {
 		volumes := GetVolumeArray(candles)
 		last50 := closingPrice[len(closingPrice)-50:]
 		last20Volume := volumes[len(volumes)-20:]
-		s.CalculateSma(last20Volume, 9, key)
-		s.CalculateEma(last50, 44, key)
-		emaArray := s.GetEmaArray(key)
-		smaArray := s.GetSmaArray(key)
+		CalculateSma(last20Volume, 9, key)
+		CalculateEma(last50, 44, key)
+		emaArray := GetEmaArray(key)
+		smaArray := GetSmaArray(key)
 		if lastCandle.Low > emaArray[len(emaArray)-1] && lastCandle.High >= 200.00 && lastCandle.High <= 1000.00 {
 			filteredList = append(filteredList, params{
 				key:    key,
@@ -112,9 +133,8 @@ func (s strategy) getPrevData(token string) {
 		tokenMap[token] = pastData
 	}
 }
-func (s *strategy) fillPastData(symbol string) {
+func (s *strategy) fillPastData(symbol string, exhange string, max int) {
 	// add last 10 days data
-	var max = 10
 
 	for count := 0; count < max; count++ {
 		t := time.Now()
@@ -132,7 +152,7 @@ func (s *strategy) fillPastData(symbol string) {
 		toDate := fmt.Sprintf("%d-%02d-%02d %v", year, month, day, endTime)
 
 		candles, err := s.history.GetCandle(smartapigo.CandleParams{
-			Exchange:    "MCX",
+			Exchange:    exhange,
 			SymbolToken: symbol,
 			Interval:    "FIVE_MINUTE",
 			FromDate:    fromDate,
@@ -149,15 +169,14 @@ func (s *strategy) fillPastData(symbol string) {
 
 func (s *strategy) makeCandle(ch <-chan *models.SnapQuote, duration int) {
 	for data := range ch {
-		epochSeconds := int64(data.ExchangeFeedTimeEpochMillis) / 1000
-		dataTimeFormatted := time.Unix(epochSeconds, 0)
 		lastCandleFormAt := s.pastData[len(s.pastData)-1].Timestamp
 		nextCandleFormAt := lastCandleFormAt.Add(time.Second * time.Duration(duration))
 		currentTime := time.Now()
 		if currentTime.After(nextCandleFormAt) {
+
 			s.pastData[len(s.pastData)-1].Timestamp = nextCandleFormAt
 			tempOhlc = CandleResponse{
-				Timestamp: dataTimeFormatted,
+				Timestamp: nextCandleFormAt,
 				Open:      float64(data.LastTradedPrice) / 100,
 				High:      float64(data.LastTradedPrice) / 100,
 				Low:       float64(data.LastTradedPrice) / 100,
@@ -194,9 +213,145 @@ func (s *strategy) makeCandle(ch <-chan *models.SnapQuote, duration int) {
 			} else {
 				tempOhlc.Close = float64(data.LastTradedPrice) / 100
 				s.pastData[len(s.pastData)-1].Close = tempOhlc.Close
+				s.pastData[len(s.pastData)-1].High = math.Max(s.pastData[len(s.pastData)-1].High, tempOhlc.Close)
+				s.pastData[len(s.pastData)-1].Low = math.Min(s.pastData[len(s.pastData)-1].Low, tempOhlc.Close)
 			}
 
 		}
 	}
 
+}
+
+func trainModel(pastData []smartapigo.CandleResponse, token string) {
+	ohlcData := make([][]float64, 0)
+	for _, dataPoint := range pastData {
+		data := []float64{
+			dataPoint.Open,
+			dataPoint.High,
+			dataPoint.Low,
+			dataPoint.Close,
+		}
+
+		ohlcData = append(ohlcData, data)
+	}
+
+	// Define the payload
+	payload := map[string]interface{}{
+		"stock_name": token,
+		"ohlc_data":  ohlcData,
+	}
+
+	// Convert the payload to JSON
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("Error encoding JSON:", err)
+		return
+	}
+
+	// Define the API endpoint URL
+	trainingUrl := "http://127.0.0.1:6000/train_model" // Replace with your API URL
+
+	// Send a POST request to the API
+	resp, err := http.Post(trainingUrl, "application/json", bytes.NewBuffer(payloadJSON))
+	if err != nil {
+		fmt.Println("Error sending POST request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Check the response status
+	if resp.StatusCode == http.StatusOK {
+		fmt.Println("API call successful")
+	} else {
+		fmt.Println("API call failed with status:", resp.Status)
+	}
+}
+
+func GetNextPrice(stockName string, pastData []smartapigo.CandleResponse) (float64, error) {
+	// Define the URL of the Python API
+	var ohlcData []map[string]interface{}
+	for _, candle := range pastData {
+		data := map[string]interface{}{
+			"Open":  candle.Open,
+			"High":  candle.High,
+			"Low":   candle.Low,
+			"Close": candle.Close,
+		}
+		ohlcData = append(ohlcData, data)
+	}
+	apiURL := "http://localhost:5001/get_next_price"
+
+	// Create a request payload
+	requestData := map[string]interface{}{
+		"stock_name": stockName,
+		"ohlc_data":  ohlcData,
+	}
+
+	requestBody, err := json.Marshal(requestData)
+	if err != nil {
+		return 0, err
+	}
+
+	// Send a POST request to the Python API
+	response, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return 0, err
+	}
+	defer response.Body.Close()
+
+	// Read and parse the response from the Python API
+	responseBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	// Parse the JSON response
+	var responseData map[string]interface{}
+	err = json.Unmarshal(responseBody, &responseData)
+	if err != nil {
+		return 0, err
+	}
+
+	// Check if the response contains an error
+	if errorMessage, ok := responseData["error"]; ok {
+		return 0, fmt.Errorf("Python API error: %s", errorMessage)
+	}
+
+	// Extract the predicted price from the response
+	predictedPrice, ok := responseData["next_predicted_price"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("Failed to get the next predicted price")
+	}
+
+	return predictedPrice, nil
+}
+
+func PopulateIndicators(candles []smartapigo.CandleResponse, token string) {
+	var closePrice = GetClosePriceArray(candles)
+	CalculateEma(closePrice, 9, token)
+	CalculateSma(closePrice, 9, token)
+	CalculateRsi(closePrice, 14, token)
+	CalculateAtr(candles, 14, token)
+	CalculateMACD(closePrice, 9, 26, token)
+	CalculateSto(candles, 14, token)
+	CalculateSignalLine(closePrice, 14, 9, 26, token)
+	CalculateHeikinAshi(candles, token)
+	CalculateAdx(candles, 14, token)
+	for i := 3; i <= 30; i++ {
+		CalculateSma(closePrice, i, token+strconv.Itoa(i))
+	}
+}
+
+func CalculatePositionSize(buyPrice, sl float64) int {
+	if Amount/buyPrice <= 1 {
+		return 0
+	}
+	maxRiskPercent := 0.05 // 2% maximum risk allowed
+	maxRiskAmount := Amount * maxRiskPercent
+	riskPerShare := math.Max(1, math.Abs(buyPrice-sl))
+	positionSize := maxRiskAmount / riskPerShare
+	return int(math.Min(Amount/buyPrice, positionSize))
+}
+func SetAmount(amount float64) {
+	Amount = amount
 }

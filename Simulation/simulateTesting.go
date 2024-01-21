@@ -2,6 +2,7 @@ package Simulation
 
 import (
 	"fmt"
+	smartapigo "github.com/TredingInGo/smartapi"
 	"math"
 	"time"
 )
@@ -135,4 +136,28 @@ func calculatePositionSize(buyPrice, sl float64) float64 {
 	riskPerShare := math.Max(1, buyPrice-sl)
 	positionSize := maxRiskAmount / riskPerShare
 	return math.Min(amount/buyPrice, positionSize)
+}
+
+func simulateBuyorder(data []smartapigo.CandleResponse, quantity, idx int, price, sl, tp float64) (float64, int) {
+	for i := idx; i < len(data); i++ {
+		if data[i].Low <= sl {
+			return (sl - price) * float64(quantity), i + 1
+		} else if data[i].High >= tp {
+			return (tp - price) * float64(quantity), i + 1
+		}
+
+	}
+	return (data[len(data)-1].Close - price) * float64(quantity), len(data)
+}
+
+func simulateSellorder(data []smartapigo.CandleResponse, quantity, idx int, price, sl, tp float64) (float64, int) {
+	for i := idx; i < len(data); i++ {
+		if data[i].High >= sl {
+			return (price - sl) * float64(quantity), i + 1
+		} else if data[i].Low <= tp {
+			return (price - tp) * float64(quantity), i + 1
+		}
+
+	}
+	return (data[len(data)-1].Close - price) * float64(quantity), len(data)
 }

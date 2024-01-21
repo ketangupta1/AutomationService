@@ -25,6 +25,7 @@ const (
 	URIRMS              string = "rest/secure/angelbroking/user/v1/getRMS"
 	URIConvertPosition  string = "rest/secure/angelbroking/order/v1/convertPosition"
 	URICandleData       string = "rest/secure/angelbroking/historical/v1/getCandleData"
+	APIKey              string = "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"
 )
 
 func GetIpAndMac() (string, string, string, error) {

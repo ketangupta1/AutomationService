@@ -3,9 +3,10 @@ package Simulation
 import (
 	"database/sql"
 	"fmt"
+	smartapigo "github.com/TredingInGo/smartapi"
 	_ "github.com/lib/pq"
 	"log"
-	"math"
+	"time"
 )
 
 type tradeResult struct {
@@ -44,7 +45,7 @@ type OHLC struct {
 	High             float64 `json:"high"`
 	Low              float64 `json:"low"`
 	Close            float64 `json:"close"`
-	Volume           float64 `json:"volume"`
+	Volume           int     `json:"volume"`
 	ID               int64   `json:"id"`
 	TimeFrameSeconds int64   `json:"timeFrameSeconds"`
 }
@@ -59,24 +60,16 @@ var trades []tradeRecord
 var trade []tradeReport
 
 func DoBackTest(db *sql.DB) {
+	data := GetData(db, "13061")
+	dataToTest := getDataiInCandleResponseFormate(data)
+	backTestSystems(dataToTest, "13061")
+	//RunStrategyRSI(dataToTest[len(dataToTest)-7500:])
+	//RunStrategy(dataToTest)
 
-	ohlcData := GetData(db)
-	//for i := 24; i < 100; i++ {
-	//	for j := 20; j < i; j++ {
-	//		for k := 32; k < 90; k++ {
-	//			executetest(ohlcData, j, i, k, db)
-	//
-	//		}
-	//	}
-	//
-	//}
-
-	breakoutStretgy(ohlcData)
-	saveTradeReport(trade, db)
 }
 
-func GetData(db *sql.DB) []OHLC {
-	rows, err := db.Query(`SELECT * FROM "History"."OHLCData" WHERE id = 2885 AND timeframeinseconds = 900  order by timestamp limit 30000`)
+func GetData(db *sql.DB, token string) []OHLC {
+	rows, err := db.Query(`SELECT * FROM "History"."OHLCData" WHERE id = $1 AND timeframeinseconds = 300  order by timestamp`, token)
 	if err != nil {
 		log.Fatalf("Error querying data from the table: %v", err)
 	}
@@ -111,144 +104,7 @@ func GetData(db *sql.DB) []OHLC {
 
 }
 
-func executetest(ohlcData []OHLC, smaLow int, smaHigh int, rsiPeriod int, db *sql.DB) {
-	amount = 100000.0
-	maxAmount = amount
-	minAmount = amount
-	profitCount = 0
-	lossCount = 0
-	var tradeHistory tradeResult
-
-	sma5 := CalculateSMA(ohlcData, smaLow)
-
-	sma20 := CalculateSMA(ohlcData, smaHigh)
-
-	k := 2.0
-	ubb, lbb := CalculateBollingerBands(ohlcData, 20, k)
-
-	for i := 100; i < len(ohlcData)-102; i++ {
-		rsi := CalculateRSI(ohlcData, i, rsiPeriod)
-		buySignal := false
-		trend := "none"
-		if ohlcData[i].Close > ubb[i-20] {
-			trend = "up"
-		} else if ohlcData[i].Close < lbb[i-20] {
-			trend = "down"
-		}
-		if sma5[i] > sma20[i] && trend == "up" {
-
-			if rsi > 60 && ohlcData[i].Close >= ohlcData[i-1].High {
-				buySignal = true
-			}
-		}
-		if buySignal {
-
-			sl := ohlcData[i-1].Low
-			bp := ohlcData[i].Close
-			tp := (bp - sl) + bp
-			//PlaceBuyOrder(ohlcData, i, sl, tp, bp)
-			fmt.Printf("Buy at %.2f, SL at %.2f, TP at %.2f\n", ohlcData[i].Close, sl, tp)
-		}
-	}
-	tradeHistory.amount = amount
-	tradeHistory.totalTrade = totalTrade
-	tradeHistory.maxAmount = maxAmount
-	tradeHistory.minAmount = minAmount
-	tradeHistory.profitCount = profitCount
-	tradeHistory.lossCount = lossCount
-	tradeHistory.stockSymbol = ohlcData[0].ID
-	tradeHistory.timeDuration = ohlcData[0].TimeFrameSeconds
-	tradeHistory.smaLow = smaLow
-	tradeHistory.smaHigh = smaHigh
-	tradeHistory.rsiPeriod = rsiPeriod
-	insertTradeSummery(tradeHistory, db)
-
-}
-
-func insertTradeSummery(trades tradeResult, db *sql.DB) {
-	insertQuery := `INSERT INTO "History"."TradeSummary" (
-                        amount, profitCount, lossCount, totalTrade,
-						maxAmount, minAmount, stockSymbol, timeDuration,
-						smaLow, smaHigh, rsiPeriod
-					) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
-
-	_, err := db.Exec(insertQuery,
-		trades.amount,
-		trades.profitCount,
-		trades.lossCount,
-		trades.totalTrade,
-		trades.maxAmount,
-		trades.minAmount,
-		trades.stockSymbol,
-		trades.timeDuration,
-		trades.smaLow,
-		trades.smaHigh,
-		trades.rsiPeriod,
-	)
-
-	if err != nil {
-		fmt.Println("Error executing INSERT query:", err)
-	}
-}
-
-// 2nd stretgy ...........
-
-func breakoutStretgy(data []OHLC) {
-	amount = 300000.0
-	maxAmount = amount
-	minAmount = amount
-	profitCount = 0
-	lossCount = 0
-
-	high, low := calculateLowHigh(data, 4)
-	Totaldays := len(data) / 25
-	for day := Totaldays / 2; day <= Totaldays; day++ {
-		high, low = calculateLowHigh(data, (day-1)*25)
-		index := (day-1)*25 + 1
-
-		doExecute(data, index, low, high)
-
-	}
-}
-
-func calculateLowHigh(data []OHLC, index int) (high float64, low float64) {
-	return data[index].High, data[index].Low
-	//high = 0.0
-	//low = 100000.0
-	//for it := index - 1; it >= index-4; it-- {
-	//	high = math.Max(high, data[it].High)
-	//	low = math.Min(low, data[it].Low)
-	//}
-	//return high, low
-}
-
-func calculateWeightedPercentage(candle OHLC) float64 {
-	weightedHigh := math.Abs(candle.High - candle.Low)
-	weightedClose := math.Abs(candle.Close - candle.Open)
-	weightedPercentage := (weightedClose * 100) / weightedHigh
-	return weightedPercentage
-}
-func triggerBuyOrder(data []OHLC, candle OHLC, index int, high float64, length int) int {
-	for i := index; i < length; i++ {
-		if data[i].High >= candle.High {
-			return PlaceBuyOrder(data, i, candle.High, candle.Low, data[i].High, length)
-		}
-	}
-	return length
-}
-
-func triggerSellOrder(data []OHLC, candle OHLC, index int, low float64) {
-	for i := index; i < len(data); i++ {
-		if data[i].High > low {
-			return
-		}
-		if data[i].Low <= candle.Low {
-			//PlaceSellOrder(data, i, candle.High, data[i].Low-2*(candle.High-data[i].Low), data[i].Low)
-		}
-	}
-}
-
-func saveTradeReport(trades []tradeReport, db *sql.DB) {
+func SaveTradeReport(trades []tradeReport, db *sql.DB) {
 	for i := 0; i < len(trades); i++ {
 		insertSQL := `
 		INSERT INTO "History"."TradeReport" (amount, profit, loss, strategyName, entry, tp, sl)
@@ -271,16 +127,23 @@ func saveTradeReport(trades []tradeReport, db *sql.DB) {
 		//fmt.Printf("Inserted row with ID: %d\n", insertedID)
 	}
 }
+func getDataiInCandleResponseFormate(data []OHLC) []smartapigo.CandleResponse {
+	dataSize := len(data)
+	var dataToTest []smartapigo.CandleResponse
+	layout := "2006-01-02 15:04:05-07:00" // This should match the format of your date string
 
-func doExecute(data []OHLC, index int, low, high float64) {
-	it := index
-	for i := it; i < index+24; i++ {
-		// buying logic
-		if amount <= 0 {
-			return
-		}
-		if data[i].High > high && data[i-1].Low < high && data[i].Close < data[i].Open {
-			i = triggerBuyOrder(data, data[i], i, high, index+24)
-		}
+	// Parse the date string into a time.Time variable
+	for i := 0; i < dataSize; i++ {
+		dateTime, err := time.Parse(layout, data[i].Timestamp)
+		fmt.Print(err)
+		dataToTest = append(dataToTest, smartapigo.CandleResponse{
+			Timestamp: dateTime,
+			Open:      data[i].Open,
+			High:      data[i].High,
+			Low:       data[i].Low,
+			Close:     data[i].Close,
+			Volume:    data[i].Volume,
+		})
 	}
+	return dataToTest
 }
