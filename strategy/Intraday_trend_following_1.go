@@ -28,31 +28,33 @@ var orderId = make(map[string]bool)
 var myMutex sync.Mutex
 
 func CloseSession(client *smartapigo.Client) {
+
 	currentTime := time.Now()
 	compareTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 15, 0, 0, 0, currentTime.Location())
 
 	if currentTime.After(compareTime) {
 		client.Logout()
 		fmt.Printf("Session closed ")
+		return
 	}
 
 }
 func TrendFollowingStretgy(client *smartapigo.Client, db *sql.DB) {
-	go CloseSession(client)
+
 	stockList := LoadStockList(db)
 	UpdateAmount(client)
 	TrackOrders(client, "DUMMY")
 	for {
 
 		for _, stock := range stockList {
-
+			CloseSession(client)
 			if !flag {
+
 				Execute(stock.Token, stock.Symbol, client)
 			}
 
 		}
-		//time.Sleep(5 * time.Second)
-
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -61,27 +63,12 @@ func Execute(symbol, stockToken string, client *smartapigo.Client) {
 	if len(data) == 0 {
 		return
 	}
-	lptParams := smartapigo.LTPParams{
-		"NSE",
-		symbol,
-		stockToken,
-	}
-	ltp, _ := client.GetLTP(lptParams)
-	dataToAppend := smartapigo.CandleResponse{
-		Timestamp: time.Now(),
-		Open:      ltp.Open,
-		High:      ltp.High,
-		Low:       ltp.Low,
-		Close:     ltp.Close,
-		Volume:    0,
-	}
-	data = append(data, dataToAppend)
-	myMutex.Lock()
+	//myMutex.Lock()
 	PopulateIndicators(data, stockToken)
 
-	myMutex.Unlock()
+	//myMutex.Unlock()
 	UpdateAmount(client)
-	order := TrendFollowingRsi(data, stockToken)
+	order := TrendFollowingRsi(data, stockToken, symbol)
 	if order.OrderType == "None" {
 		return
 	}
@@ -92,33 +79,31 @@ func Execute(symbol, stockToken string, client *smartapigo.Client) {
 	orderParams := SetOrderParams(order, stockToken, symbol)
 	fmt.Printf("\norder params:\n%v\n", orderParams)
 	var orderRes smartapigo.OrderResponse
-	myMutex.Lock()
+	//myMutex.Lock()
 	if flag == false {
-		//flag = true
+		flag = true
 		orderRes, _ = client.PlaceOrder(orderParams)
 		fmt.Printf("order response %v", orderRes)
 
 	}
 
-	myMutex.Unlock()
+	//myMutex.Unlock()
 	UpdateAmount(client)
 	TrackOrders(client, symbol)
 	UpdateAmount(client)
 }
 
-func TrendFollowingRsi(data []smartapigo.CandleResponse, token string) ORDER {
+func TrendFollowingRsi(data []smartapigo.CandleResponse, token, symbol string) ORDER {
 	idx := len(data) - 1
-	sma1 := 7
-	sma2 := 22
-	sma3 := sma[token+"3"][idx]
 	sma5 := sma[token+"5"][idx]
 	sma8 := sma[token+"8"][idx]
 	adx14 := adx[token]
 	rsi := rsi[token]
 	var order ORDER
 	order.OrderType = "None"
-	if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma3 > sma5 && sma5 > sma8 && sma8 > sma[token+"13"][idx] && sma[token+"13"][idx] > sma[token+"21"][idx] && rsi[idx] < 75 && rsi[idx] > 60 && rsi[idx-2] < rsi[idx] {
-		fmt.Printf("order placed: trend following adx = %v \n", adx14.Adx[idx])
+	fmt.Printf("\nStock Name: %v\n", symbol)
+	fmt.Printf("adx = %v, sma5 = %v, sma8 = %v, sma13 = %v, sma21 = %v, rsi = %v ", adx14.Adx[idx], sma5, sma8, sma[token+"13"][idx], sma[token+"21"][idx], rsi[idx])
+	if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma5 > sma8 && sma8 > sma[token+"13"][idx] && sma[token+"13"][idx] > sma[token+"21"][idx] && rsi[idx] < 70 && rsi[idx] > 55 && rsi[idx-2] < rsi[idx] {
 		order = ORDER{
 			Spot:      data[idx].High + 0.05,
 			Sl:        int(data[idx].High * 0.01),
@@ -126,35 +111,20 @@ func TrendFollowingRsi(data []smartapigo.CandleResponse, token string) ORDER {
 			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
 			OrderType: "BUY",
 		}
-	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] < adx14.MinusDi[idx] && sma3 < sma5 && sma5 < sma8 && sma8 < sma[token+"13"][idx] && sma[token+"13"][idx] < sma[token+"21"][idx] && rsi[idx] < 40 && rsi[idx] > 30 && rsi[idx-2] > rsi[idx] {
+
+	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] < adx14.MinusDi[idx] && sma5 < sma8 && sma8 < sma[token+"13"][idx] && sma[token+"13"][idx] < sma[token+"21"][idx] && rsi[idx] < 40 && rsi[idx] > 30 && rsi[idx-2] > rsi[idx] {
 		fmt.Printf("order placed: trend following %v\n", adx14.Adx[idx])
 		order = ORDER{
 			Spot:      data[idx].Low - 0.05,
-			Sl:        int(data[idx].High * 0.01),
-			Tp:        int(data[idx].High * 0.02),
+			Sl:        int(data[idx].Low * 0.01),
+			Tp:        int(data[idx].Low * 0.02),
 			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
 			OrderType: "SELL",
 		}
-	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma[token+"7"][idx-1] < sma[token+"22"][idx-1] && sma[token+strconv.Itoa(sma1)][idx] > sma[token+strconv.Itoa(sma2)][idx] && rsi[idx] < 30 && rsi[idx-1] < rsi[idx] {
-		fmt.Printf("order placed: trend reversal\n")
-		order = ORDER{
-			Spot:      data[idx].High + 0.05,
-			Sl:        int(data[idx].High * 0.01),
-			Tp:        int(data[idx].High * 0.02),
-			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
-			OrderType: "BUY",
-		}
-	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] < adx14.MinusDi[idx] && sma[token+"7"][idx-1] > sma[token+"22"][idx-1] && sma[token+strconv.Itoa(sma1)][idx] < sma[token+strconv.Itoa(sma2)][idx] && rsi[idx] > 75 && rsi[idx-1] > rsi[idx] {
-		fmt.Printf("order placed: trend reversal\n")
-		order = ORDER{
-			Spot:      data[idx].Low - 0.5,
-			Sl:        int(data[idx].High * 0.01),
-			Tp:        int(data[idx].High * 0.02),
-			Quantity:  CalculatePosition(data[idx].Low, data[idx].High-data[idx].High*0.01),
-			OrderType: "SELL",
-		}
+
+		fmt.Printf("order placed: %v\n", order)
 	}
-	fmt.Printf("order placed: %v\n", order)
+
 	return order
 }
 
@@ -173,7 +143,7 @@ func SetOrderParams(order ORDER, token, symbol string) smartapigo.OrderParams {
 		SquareOff:        strconv.Itoa(order.Tp),
 		StopLoss:         strconv.Itoa(order.Sl),
 		Quantity:         strconv.Itoa(order.Quantity),
-		TrailingStopLoss: strconv.Itoa(order.Sl),
+		TrailingStopLoss: strconv.Itoa(1),
 	}
 	return orderParams
 }
@@ -196,9 +166,14 @@ func TrackOrders(client *smartapigo.Client, symbol string) {
 		positions, _ := client.GetPositions()
 		isAnyPostionOpen := false
 		totalPL := 0.0
-		fmt.Printf("\nPositions %v\n", positions)
-
+		fmt.Printf("\n*************** Positions ************** \n")
+		isPrint := true
 		for _, postion := range positions {
+			if isPrint {
+				fmt.Printf("\n%v\n", postion)
+				isPrint = false
+			}
+
 			qty, _ := strconv.Atoi(postion.NetQty)
 			if postion.SymbolName == symbol && qty != 0 {
 				pl, _ := strconv.ParseFloat(postion.NetValue, 64)
@@ -224,9 +199,9 @@ func TrackOrders(client *smartapigo.Client, symbol string) {
 }
 
 func setFlag(val bool) {
-	myMutex.Lock()
+	//myMutex.Lock()
 	flag = val
-	myMutex.Unlock()
+	//myMutex.Unlock()
 
 }
 

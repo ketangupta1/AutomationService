@@ -109,6 +109,21 @@ func main() {
 
 	}).Methods(http.MethodPost)
 
+	r.HandleFunc("/swing", func(writer http.ResponseWriter, request *http.Request) {
+		if session.FeedToken == "" {
+			fmt.Println("feed token not set")
+			return
+		}
+
+		body, _ := ioutil.ReadAll(request.Body)
+		//strategy.PopuletInstrumentsList()
+		var param = make(map[string]string)
+		json.Unmarshal(body, &param)
+		db := Simulation.Connect()
+		strategy.SwingScreener(apiClient, db)
+
+	}).Methods(http.MethodPost)
+
 	r.HandleFunc("/renew", func(writer http.ResponseWriter, request *http.Request) {
 		//Renew User Tokens using refresh token
 		session.UserSessionTokens, err = apiClient.RenewAccessToken(session.RefreshToken)

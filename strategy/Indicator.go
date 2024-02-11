@@ -86,29 +86,21 @@ func GetSmaArray(token string) []float64 {
 }
 
 func CalculateEma(data []float64, period int, stockName string) {
-	emaArray := ema[stockName]
+	var emaArray []float64
 	multiplier := 2.0 / float64(period+1)
-	if len(emaArray) == 0 {
-		sum := 0.0
-		for i := 0; i < period-1; i++ {
-			emaArray = append(emaArray, -1.0)
-			sum += data[i]
-		}
-		sum += data[period-1]
-		emaArray = append(emaArray, roundTwo(sum/float64(period)))
-		for i := period; i < len(data); i++ {
-			Current := roundTwo(((data[i] - emaArray[i-1]) * multiplier) + emaArray[i-1])
-			emaArray = append(emaArray, Current)
-		}
-		ema[stockName] = emaArray
-		return
+	sum := 0.0
+	for i := 0; i < period-1; i++ {
+		emaArray = append(emaArray, -1.0)
+		sum += data[i]
 	}
-	if len(emaArray) < len(data) {
-		for i := len(emaArray); i < len(data); i++ {
-			Current := ((data[i] - emaArray[i-1]) * multiplier) + emaArray[i-1]
-			emaArray = append(emaArray, roundTwo(Current))
-		}
+	sum += data[period-1]
+	emaArray = append(emaArray, roundTwo(sum/float64(period)))
+	for i := period; i < len(data); i++ {
+		Current := roundTwo(((data[i] - emaArray[i-1]) * multiplier) + emaArray[i-1])
+		emaArray = append(emaArray, Current)
 	}
+	ema[stockName] = emaArray
+	return
 	ema[stockName] = emaArray
 }
 func GetEma(stockName string, ltp float64, period int) float64 {
@@ -126,7 +118,7 @@ func GetEmaArray(stockName string) []float64 {
 }
 
 func CalculateRsi(data []float64, period int, stockName string) {
-	rsiArray := rsi[stockName]
+	var rsiArray []float64
 
 	var changeArray []float64
 	var gainArray []float64
@@ -150,31 +142,19 @@ func CalculateRsi(data []float64, period int, stockName string) {
 	}
 	stock1 := "Gain" + stockName
 	stock2 := "Loss" + stockName
-	CalculateSma(gainArray, period, stock1)
-	CalculateSma(lossArray, period, stock2)
-	avgGainArray := GetSmaArray(stock1)
-	avgLossArray := GetSmaArray(stock2)
-	if len(rsiArray) == 0 {
-		for i := 0; i < len(data); i++ {
-			avgGain := avgGainArray[i]
-			avgLoss := avgLossArray[i]
-			rs := roundTwo(avgGain / avgLoss)
-			rsiVal := 100 - (100 / (1 + rs))
-			rsiArray = append(rsiArray, roundTwo(rsiVal))
-		}
-		rsi[stockName] = rsiArray
-		return
+	CalculateEma(gainArray, period, stock1)
+	CalculateEma(lossArray, period, stock2)
+	avgGainArray := GetEmaArray(stock1)
+	avgLossArray := GetEmaArray(stock2)
+	for i := 0; i < len(data); i++ {
+		avgGain := avgGainArray[i]
+		avgLoss := avgLossArray[i]
+		rs := roundTwo(avgGain / avgLoss)
+		rsiVal := 100 - (100 / (1 + rs))
+		rsiArray = append(rsiArray, roundTwo(rsiVal))
 	}
-	if len(rsiArray) < len(data) {
-		for i := len(rsiArray); i < len(data); i++ {
-			avgGain := avgGainArray[i]
-			avgLoss := avgLossArray[i]
-			rs := roundTwo(avgGain / avgLoss)
-			rsiVal := 100 - (100 / (1 + rs))
-			rsiArray = append(rsiArray, roundTwo(rsiVal))
-		}
-		rsi[stockName] = rsiArray
-	}
+	rsi[stockName] = rsiArray
+
 }
 
 func GetRsi(stockName string) []float64 {
