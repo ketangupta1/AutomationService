@@ -34,4 +34,4 @@ jobs:
         with:
           app-name: go-azure-appservice
           package: build/
-          publish-profile: ${{ secrets.TRADINGINGO }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
