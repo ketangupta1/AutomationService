@@ -33,7 +33,7 @@ func TrendFollwoCrossSystemSMA(data []smartapigo.CandleResponse, idx int, token 
 			Spot:      data[idx].High + 0.05,
 			Sl:        int(math.Max(data[idx].High*0.005, 1.0)),
 			Tp:        int(data[idx].High * 0.01),
-			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
+			Quantity:  CalculatePositionSize(data[idx].High, data[idx].High-data[idx].High*0.01),
 			OrderType: "BUY",
 		}
 	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] < adx14.MinusDi[idx] && sma3 < sma5 && sma5 < sma8 && sma8 < sma[token+"13"][idx] && sma[token+"13"][idx] < sma[token+"21"][idx] && rsi[idx] < 40 && rsi[idx] > 30 && rsi[idx-2] > rsi[idx] {
@@ -42,7 +42,7 @@ func TrendFollwoCrossSystemSMA(data []smartapigo.CandleResponse, idx int, token 
 			Spot:      data[idx].Low - 0.05,
 			Sl:        int(math.Max(data[idx].High*0.005, 1.0)),
 			Tp:        int(data[idx].Low * 0.01),
-			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
+			Quantity:  CalculatePositionSize(data[idx].High, data[idx].High-data[idx].High*0.01),
 			OrderType: "SELL",
 		}
 	}

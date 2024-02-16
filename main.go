@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"github.com/TredingInGo/AutomationService/Simulation"
 	"github.com/TredingInGo/AutomationService/historyData"
-	"github.com/TredingInGo/AutomationService/smartStream"
 	"github.com/TredingInGo/AutomationService/strategy"
 	smartapi "github.com/TredingInGo/smartapi"
-	"github.com/TredingInGo/smartapi/models"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
@@ -44,22 +42,31 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/session", func(writer http.ResponseWriter, request *http.Request) {
-		//// Create New Angel Broking Client
-		apiClient = smartapi.New(clientCode, password, marketKey)
 
 		m := map[string]string{}
 		body, err := ioutil.ReadAll(request.Body)
-
-		json.Unmarshal(body, &m)
-		//User Login and Generate User Session
-		session, err = apiClient.GenerateSession(m["totp"])
 		if err != nil {
-			fmt.Println(err.Error())
+			http.Error(writer, "Error reading request body", http.StatusBadRequest)
 			return
 		}
 
-		fmt.Println("User Session Tokens :- ", session.UserSessionTokens)
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			http.Error(writer, "Error parsing JSON request body", http.StatusBadRequest)
+			return
+		}
+		apiClient := smartapi.New(m["clientCode"], m["password"], m["marketKey"])
+		session, err := apiClient.GenerateSession(m["totp"])
+		if err != nil {
+			errorMessage := fmt.Sprintf("Error generating session: %s", err.Error())
+			http.Error(writer, errorMessage, http.StatusInternalServerError)
+			return
+		}
 		setEnv(session)
+
+		successMessage := fmt.Sprintf("User Session Tokens: %v", session.UserSessionTokens)
+		writer.WriteHeader(http.StatusOK)
+		json.NewEncoder(writer).Encode(map[string]string{"message": "Connected successfully", "sessionTokens": successMessage})
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
@@ -74,6 +81,7 @@ func main() {
 			ToDate:      params.Get("toDate"),
 		})
 		if err != nil {
+
 			fmt.Println(err.Error())
 		}
 
@@ -89,24 +97,11 @@ func main() {
 			fmt.Println("feed token not set")
 			return
 		}
-
 		body, _ := ioutil.ReadAll(request.Body)
-		//strategy.PopuletInstrumentsList()
 		var param = make(map[string]string)
 		json.Unmarshal(body, &param)
 		db := Simulation.Connect()
-		history := historyData.New(apiClient)
-		someAlgo := strategy.New(history, db)
-		client := smartStream.New(clientCode, feedToken)
-		//Simulation.CollectData(db, apiClient)
 		strategy.TrendFollowingStretgy(apiClient, db)
-		//filteredStocks := someAlgo.FilterStocks("NSE")
-		//token := strategy.GetToken(filteredStocks[len(filteredStocks)-1], "NSE")
-		token := "15083"
-		strategy.Init(token)
-		go client.Connect(someAlgo.LiveData, models.SNAPQUOTE, models.NSECM, token)
-		go someAlgo.Algo(token)
-
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/swing", func(writer http.ResponseWriter, request *http.Request) {
@@ -120,6 +115,7 @@ func main() {
 		var param = make(map[string]string)
 		json.Unmarshal(body, &param)
 		db := Simulation.Connect()
+		// Simulation.CollectData(db, apiClient) //this will populate list of stocks.
 		strategy.SwingScreener(apiClient, db)
 
 	}).Methods(http.MethodPost)
@@ -172,8 +168,14 @@ func main() {
 
 		fmt.Println("Placed Order ID and Script :- ", order)
 	})
+	port := os.Getenv("HTTP_PLATFORM_PORT")
 
-	http.ListenAndServe(":8000", r)
+	// default back to 8080 for local dev
+	if port == "" {
+		port = "8000"
+	}
+
+	http.ListenAndServe(":"+port, r)
 }
 
 func setEnv(session smartapi.UserSession) {

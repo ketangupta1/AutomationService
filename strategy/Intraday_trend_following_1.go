@@ -5,7 +5,6 @@ import (
 	"fmt"
 	smartapigo "github.com/TredingInGo/smartapi"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -22,11 +21,6 @@ type Symbols struct {
 	Token  string `json:"token"`
 }
 
-var flag = false
-var amount = 0.0
-var orderId = make(map[string]bool)
-var myMutex sync.Mutex
-
 func CloseSession(client *smartapigo.Client) {
 
 	currentTime := time.Now()
@@ -42,17 +36,11 @@ func CloseSession(client *smartapigo.Client) {
 func TrendFollowingStretgy(client *smartapigo.Client, db *sql.DB) {
 
 	stockList := LoadStockList(db)
-	UpdateAmount(client)
 	TrackOrders(client, "DUMMY")
 	for {
-
 		for _, stock := range stockList {
 			CloseSession(client)
-			if !flag {
-
-				Execute(stock.Token, stock.Symbol, client)
-			}
-
+			Execute(stock.Token, stock.Symbol, client)
 		}
 		time.Sleep(10 * time.Second)
 	}
@@ -63,12 +51,8 @@ func Execute(symbol, stockToken string, client *smartapigo.Client) {
 	if len(data) == 0 {
 		return
 	}
-	//myMutex.Lock()
 	PopulateIndicators(data, stockToken)
-
-	//myMutex.Unlock()
-	UpdateAmount(client)
-	order := TrendFollowingRsi(data, stockToken, symbol)
+	order := TrendFollowingRsi(data, stockToken, symbol, client)
 	if order.OrderType == "None" {
 		return
 	}
@@ -79,21 +63,13 @@ func Execute(symbol, stockToken string, client *smartapigo.Client) {
 	orderParams := SetOrderParams(order, stockToken, symbol)
 	fmt.Printf("\norder params:\n%v\n", orderParams)
 	var orderRes smartapigo.OrderResponse
-	//myMutex.Lock()
-	if flag == false {
-		flag = true
-		orderRes, _ = client.PlaceOrder(orderParams)
-		fmt.Printf("order response %v", orderRes)
-
-	}
-
-	//myMutex.Unlock()
-	UpdateAmount(client)
+	orderRes, _ = client.PlaceOrder(orderParams)
+	fmt.Printf("order response %v", orderRes)
 	TrackOrders(client, symbol)
-	UpdateAmount(client)
+
 }
 
-func TrendFollowingRsi(data []smartapigo.CandleResponse, token, symbol string) ORDER {
+func TrendFollowingRsi(data []smartapigo.CandleResponse, token, symbol string, client *smartapigo.Client) ORDER {
 	idx := len(data) - 1
 	sma5 := sma[token+"5"][idx]
 	sma8 := sma[token+"8"][idx]
@@ -108,17 +84,16 @@ func TrendFollowingRsi(data []smartapigo.CandleResponse, token, symbol string) O
 			Spot:      data[idx].High + 0.05,
 			Sl:        int(data[idx].High * 0.01),
 			Tp:        int(data[idx].High * 0.02),
-			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
+			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01, client),
 			OrderType: "BUY",
 		}
 
 	} else if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] < adx14.MinusDi[idx] && sma5 < sma8 && sma8 < sma[token+"13"][idx] && sma[token+"13"][idx] < sma[token+"21"][idx] && rsi[idx] < 40 && rsi[idx] > 30 && rsi[idx-2] > rsi[idx] {
-		fmt.Printf("order placed: trend following %v\n", adx14.Adx[idx])
 		order = ORDER{
 			Spot:      data[idx].Low - 0.05,
 			Sl:        int(data[idx].Low * 0.01),
 			Tp:        int(data[idx].Low * 0.02),
-			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01),
+			Quantity:  CalculatePosition(data[idx].High, data[idx].High-data[idx].High*0.01, client),
 			OrderType: "SELL",
 		}
 
@@ -147,16 +122,14 @@ func SetOrderParams(order ORDER, token, symbol string) smartapigo.OrderParams {
 	}
 	return orderParams
 }
-func UpdateAmount(client *smartapigo.Client) {
+func GetAmount(client *smartapigo.Client) float64 {
 	RMS, _ := client.GetRMS()
-	myMutex.Lock()
 	Amount, err := strconv.ParseFloat(RMS.AvailableCash, 64)
-	amount = Amount
+	amount := Amount
 	if err != nil {
 		fmt.Println(err)
 	}
-	time.Sleep(5 * time.Second)
-	myMutex.Unlock()
+	return amount
 }
 
 func TrackOrders(client *smartapigo.Client, symbol string) {
@@ -190,7 +163,6 @@ func TrackOrders(client *smartapigo.Client, symbol string) {
 				CloseSession(client)
 			}
 			fmt.Printf("total P/L  %v", totalPL)
-			setFlag(false)
 			return
 		}
 
@@ -198,25 +170,10 @@ func TrackOrders(client *smartapigo.Client, symbol string) {
 
 }
 
-func setFlag(val bool) {
-	//myMutex.Lock()
-	flag = val
-	//myMutex.Unlock()
-
-}
-
-func CalculatePosition(buyPrice, sl float64) int {
-	myMutex.Lock()
-	Amount := amount
+func CalculatePosition(buyPrice, sl float64, client *smartapigo.Client) int {
+	Amount := GetAmount(client)
 	if Amount/buyPrice <= 1 {
 		return 0
 	}
-
-	//maxRiskPercent := 0.05 // 2% maximum risk allowed
-	//maxRiskAmount := Amount * maxRiskPercent
-	//riskPerShare := math.Max(1, math.Abs(buyPrice-sl))
-	//positionSize := maxRiskAmount / riskPerShare
-	myMutex.Unlock()
-	//return int(math.Min(Amount/buyPrice, positionSize))
 	return int(Amount/buyPrice) * 4
 }

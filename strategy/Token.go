@@ -27,10 +27,10 @@ type InstrumentList struct {
 	Instruments []Instrument `json:"instruments"`
 }
 
-var instrumentList []Instrument
+var InstrumentLists []Instrument
 
 func tokenLookup(ticker string, exchange string) string {
-	for _, instrument := range instrumentList {
+	for _, instrument := range InstrumentLists {
 		if instrument.Name == ticker && instrument.ExchSeg == exchange && getLastSymbolPart(instrument.Symbol) == "EQ" {
 			return instrument.Token
 		}
@@ -38,7 +38,7 @@ func tokenLookup(ticker string, exchange string) string {
 	return "" // Return -1 if no matching token is found
 }
 func GetStockName(token string) string {
-	for _, instrument := range instrumentList {
+	for _, instrument := range InstrumentLists {
 		if instrument.Token == token {
 			return instrument.Name
 		}
@@ -48,7 +48,7 @@ func GetStockName(token string) string {
 
 func GetAllToken(exchange string) []string {
 	var tokenList []string
-	for _, instrument := range instrumentList {
+	for _, instrument := range InstrumentLists {
 		if instrument.ExchSeg == exchange && getLastSymbolPart(instrument.Symbol) == "EQ" {
 			tokenList = append(tokenList, instrument.Token)
 		}
@@ -87,7 +87,7 @@ func PopuletInstrumentsList() {
 		return
 	}
 
-	if err := json.Unmarshal([]byte(body), &instrumentList); err != nil {
+	if err := json.Unmarshal([]byte(body), &InstrumentLists); err != nil {
 		fmt.Println("Error unmarshaling JSON:", err)
 		return
 	}

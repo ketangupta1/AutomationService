@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/TredingInGo/AutomationService/strategy"
 	smartapigo "github.com/TredingInGo/smartapi"
+	"strings"
 	"time"
 )
 
@@ -26,8 +27,8 @@ func PrepareData(db *sql.DB, client *smartapigo.Client, token string, timeFrame,
 	if len(tempHistoryData) == 0 {
 		return
 	}
-	if tempHistoryData[0].High < 700 && tempHistoryData[0].Close > 100 {
-		query := `INSERT INTO "History"."Intraday" (token, symbol)
+	if tempHistoryData[0].Close > 50 {
+		query := `INSERT INTO "History"."Swing" (token, symbol)
 			VALUES ($1, $2)`
 		_, err := db.Exec(query, symbolToken, symbol)
 		if err != nil {
@@ -63,11 +64,13 @@ func PrepareData(db *sql.DB, client *smartapigo.Client, token string, timeFrame,
 }
 
 func CollectData(db *sql.DB, client *smartapigo.Client) {
-	stocks := GetStockSymbolList()
+	strategy.PopuletInstrumentsList()
+	stocks := strategy.InstrumentLists
 	for i := range stocks {
-		token := strategy.GetToken(stocks[i].Symbol, "NSE")
+		Symbols := strings.Split(stocks[i].Symbol, "-")
+		token := strategy.GetToken(Symbols[0], "NSE")
 		stockName := strategy.GetStockName(token)
 		fmt.Printf("stock name = %v ", stockName)
-		PrepareData(db, client, token, "FIVE_MINUTE", stocks[i].Symbol)
+		PrepareData(db, client, token, "ONE_DAY", stocks[i].Symbol)
 	}
 }

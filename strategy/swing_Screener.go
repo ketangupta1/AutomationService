@@ -9,22 +9,21 @@ import (
 )
 
 func SwingScreener(client *smartapigo.Client, db *sql.DB) {
-	stockList := LoadStockList(db)
+	stockList := LoadStockListForSwing(db)
 	fmt.Printf("*************** LIST FOR SWING TRADING *****************")
 
 	for _, stock := range stockList {
+
 		ExecuteScreener(stock.Token, stock.Symbol, client)
-		return
 	}
+	fmt.Printf("Screener Completed")
 }
 
 func ExecuteScreener(symbol, stockToken string, client *smartapigo.Client) {
-	fmt.Printf("\n%v", symbol)
-	data := GetStockTickForSwing(client, stockToken, "FOUR_HOUR")
-	for i := len(data) - 1; i >= len(data)-6; i-- {
-		fmt.Printf("\n%v\n", data[i])
-	}
-	if len(data) == 0 {
+
+	data := GetStockTickForSwing(client, stockToken, "ONE_DAY")
+	//fmt.Printf("\nStock Name: %v, DataSize: %v\n", symbol, len(data))
+	if len(data) <= 30 {
 		return
 	}
 	PopulateIndicators(data, stockToken)
@@ -53,8 +52,9 @@ func TrendFollowingRsiForSwing(data []smartapigo.CandleResponse, token, symbol s
 	rsi := rsi[token]
 	var order ORDER
 	order.OrderType = "None"
-	swingLow := GetSwingLow(data, 20)
-	if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma5 > sma8 && sma8 > sma[token+"13"][idx] && sma[token+"13"][idx] > sma[token+"21"][idx] && rsi[idx] < 70 && rsi[idx] > 55 && rsi[idx-2] < rsi[idx] {
+	swingLow := GetSwingLow(data, 10)
+	var _ = GetAvgVolume(data, 20)
+	if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma5 > sma8 && sma8 > sma[token+"13"][idx] && sma[token+"13"][idx] > sma[token+"21"][idx] && rsi[idx] < 70 && rsi[idx] > 60 && rsi[idx-4] < rsi[idx] && rsi[idx-2] > rsi[idx-4] {
 		order = ORDER{
 			Spot:      data[idx].High + 0.05,
 			Sl:        int(swingLow),
@@ -94,4 +94,13 @@ func GetSwingLow(data []smartapigo.CandleResponse, day int) float64 {
 		low = math.Min(low, data[i].Low)
 	}
 	return low
+}
+
+func GetAvgVolume(data []smartapigo.CandleResponse, day int) float64 {
+	length := len(data)
+	sum := 0
+	for i := length - 1; i > length-day-1; i-- {
+		sum += data[i].Volume
+	}
+	return float64(sum) / float64(day)
 }
