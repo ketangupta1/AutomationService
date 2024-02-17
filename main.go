@@ -66,7 +66,7 @@ func main() {
 
 		successMessage := fmt.Sprintf("User Session Tokens: %v", session.UserSessionTokens)
 		writer.WriteHeader(http.StatusOK)
-		json.NewEncoder(writer).Encode(map[string]string{"message": "Connected successfully", "sessionTokens": successMessage})
+		json.NewEncoder(writer).Encode(map[string]string{"message": "Connected successfully with angel one", "sessionTokens": successMessage})
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
