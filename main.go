@@ -13,14 +13,6 @@ import (
 	"os"
 )
 
-const (
-	clientCode = "P51284799"
-	password   = "4926"
-	apiKey     = "MN9K2rhC"
-	marketKey  = "XDnby4up"
-	totp       = "874294"
-)
-
 var (
 	accessToken, feedToken, refreshToken string
 	apiClient                            *smartapi.Client

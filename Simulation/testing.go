@@ -15,7 +15,7 @@ func Connect() *sql.DB {
 	//dbName := "HistoricalData"
 
 	// Create the connection string
-	connStr := "postgres://postgres:admin@localhost:5432/HistoricalData?sslmode=disable"
+	connStr := "postgres://priti:Priti@123@localhost:5432/go-server?sslmode=disable"
 
 	// Connect to the database
 	db, err := sql.Open("postgres", connStr)
