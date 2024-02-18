@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sync"
 )
 
 var (
@@ -18,7 +19,13 @@ var (
 	apiClient                            *smartapi.Client
 	session                              smartapi.UserSession
 	err                                  error
+	userSessions                         = make(map[string]*clientSession)
 )
+
+type clientSession struct {
+	apiClient *smartapi.Client
+	session   smartapi.UserSession
+}
 
 func init() {
 	accessToken = os.Getenv("ACCESS_TOKEN")
@@ -27,6 +34,8 @@ func init() {
 }
 
 func main() {
+	mutex := sync.Mutex{}
+
 	defer func() {
 		recover()
 	}()
@@ -54,6 +63,14 @@ func main() {
 			http.Error(writer, errorMessage, http.StatusInternalServerError)
 			return
 		}
+
+		mutex.Lock()
+		userSessions[m["clientCode"]] = &clientSession{
+			apiClient: apiClient,
+			session:   session,
+		}
+		mutex.Unlock()
+
 		setEnv(session)
 
 		successMessage := fmt.Sprintf("User Session Tokens: %v", session.UserSessionTokens)
@@ -62,8 +79,24 @@ func main() {
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
-		history := historyData.New(apiClient)
 		params := request.URL.Query()
+		clientCode := params.Get("clientCode")
+		if clientCode == "" {
+			writer.Write([]byte("clientCode is required"))
+			writer.WriteHeader(400)
+			return
+		}
+		mutex.Lock()
+		userSession, ok := userSessions[clientCode]
+		mutex.Unlock()
+
+		if !ok {
+			writer.Write([]byte("clientCode not found"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		history := historyData.New(userSession.apiClient)
 
 		data, err := history.GetCandle(smartapi.CandleParams{
 			Exchange:    params.Get("exchange"),
@@ -84,35 +117,91 @@ func main() {
 		writer.WriteHeader(200)
 	}).Methods(http.MethodGet)
 
-	r.HandleFunc("/startStream", func(writer http.ResponseWriter, request *http.Request) {
-		if session.FeedToken == "" {
-			fmt.Println("feed token not set")
-			return
-		}
+	r.HandleFunc("/intra-day", func(writer http.ResponseWriter, request *http.Request) {
 		body, _ := ioutil.ReadAll(request.Body)
 		var param = make(map[string]string)
 		json.Unmarshal(body, &param)
+
+		clientCode := param["clientCode"]
+		if clientCode == "" {
+			writer.Write([]byte("clientCode is required"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		mutex.Lock()
+		userSession, ok := userSessions[clientCode]
+		mutex.Unlock()
+
+		if !ok {
+			writer.Write([]byte("clientCode not found"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		if userSession.session.FeedToken == "" {
+			fmt.Println("feed token not set")
+			return
+		}
+
 		db := Simulation.Connect()
-		strategy.TrendFollowingStretgy(apiClient, db)
+		strategy.TrendFollowingStretgy(userSession.apiClient, db)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/swing", func(writer http.ResponseWriter, request *http.Request) {
-		if session.FeedToken == "" {
+		body, _ := ioutil.ReadAll(request.Body)
+		var param = make(map[string]string)
+		json.Unmarshal(body, &param)
+
+		clientCode := param["clientCode"]
+		if clientCode == "" {
+			writer.Write([]byte("clientCode is required"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		mutex.Lock()
+		userSession, ok := userSessions[clientCode]
+		mutex.Unlock()
+
+		if !ok {
+			writer.Write([]byte("clientCode not found"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		if userSession.session.FeedToken == "" {
 			fmt.Println("feed token not set")
 			return
 		}
 
-		body, _ := ioutil.ReadAll(request.Body)
-		//strategy.PopuletInstrumentsList()
-		var param = make(map[string]string)
-		json.Unmarshal(body, &param)
 		db := Simulation.Connect()
 		// Simulation.CollectData(db, apiClient) //this will populate list of stocks.
-		strategy.SwingScreener(apiClient, db)
+		strategy.SwingScreener(userSession.apiClient, db)
 
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/renew", func(writer http.ResponseWriter, request *http.Request) {
+		params := request.URL.Query()
+		clientCode := params.Get("clientCode")
+		if clientCode == "" {
+			writer.Write([]byte("clientCode is required"))
+			writer.WriteHeader(400)
+			return
+		}
+		mutex.Lock()
+		userSession, ok := userSessions[clientCode]
+		mutex.Unlock()
+
+		if !ok {
+			writer.Write([]byte("clientCode not found"))
+			writer.WriteHeader(400)
+			return
+		}
+
+		apiClient := userSession.apiClient
+		session := userSession.session
+
 		//Renew User Tokens using refresh token
 		session.UserSessionTokens, err = apiClient.RenewAccessToken(session.RefreshToken)
 		if err != nil {
@@ -160,6 +249,7 @@ func main() {
 
 		fmt.Println("Placed Order ID and Script :- ", order)
 	})
+
 	port := os.Getenv("HTTP_PLATFORM_PORT")
 
 	// default back to 8080 for local dev
