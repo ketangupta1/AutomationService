@@ -9,6 +9,7 @@ import (
 	smartapi "github.com/TredingInGo/smartapi"
 	"github.com/gorilla/mux"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -32,7 +33,25 @@ func init() {
 	feedToken = os.Getenv("FEED_TOKEN")
 	refreshToken = os.Getenv("REFRESH_TOKEN")
 }
+func sendPing() {
+	url := "http://example.com/api"
 
+	// Create a new GET request to the URL
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Fatalf("Error occurred while calling the API: %s", err.Error())
+	}
+	defer resp.Body.Close() // Make sure to close the response body at the end
+
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Error occurred while reading the response body: %s", err.Error())
+	}
+
+	// Convert the body to a string and print it
+	fmt.Println("API Response:", string(body))
+}
 func main() {
 	mutex := sync.Mutex{}
 
@@ -76,6 +95,11 @@ func main() {
 		successMessage := fmt.Sprintf("User Session Tokens: %v", session.UserSessionTokens)
 		writer.WriteHeader(http.StatusOK)
 		json.NewEncoder(writer).Encode(map[string]string{"message": "Connected successfully with angel one", "sessionTokens": successMessage})
+	}).Methods(http.MethodPost)
+
+	r.HandleFunc("/ping", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		fmt.Println("Ping Received")
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {

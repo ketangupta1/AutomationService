@@ -25,10 +25,10 @@ func CloseSession(client *smartapigo.Client) {
 
 	currentTime := time.Now()
 	compareTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), 15, 0, 0, 0, currentTime.Location())
-
+	userProfile, _ := client.GetUserProfile()
 	if currentTime.After(compareTime) {
 		client.Logout()
-		fmt.Printf("Session closed ")
+		fmt.Printf("Session closed  for %v", userProfile.UserName)
 		return
 	}
 

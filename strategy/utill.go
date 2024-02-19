@@ -339,6 +339,7 @@ func PopulateIndicators(candles []smartapigo.CandleResponse, token string) {
 	CalculateAdx(candles, 14, token)
 	for i := 3; i <= 30; i++ {
 		CalculateSma(closePrice, i, token+strconv.Itoa(i))
+		CalculateEma(closePrice, i, token+strconv.Itoa(i))
 	}
 }
 
