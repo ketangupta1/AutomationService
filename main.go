@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 var (
@@ -34,7 +35,7 @@ func init() {
 	refreshToken = os.Getenv("REFRESH_TOKEN")
 }
 func sendPing() {
-	url := "http://example.com/api"
+	url := "https://tredingingo.onrender.com/ping"
 
 	// Create a new GET request to the URL
 	resp, err := http.Get(url)
@@ -51,10 +52,11 @@ func sendPing() {
 
 	// Convert the body to a string and print it
 	fmt.Println("API Response:", string(body))
+	time.Sleep(120 * time.Second)
 }
 func main() {
 	mutex := sync.Mutex{}
-
+	go sendPing()
 	defer func() {
 		recover()
 	}()
@@ -100,7 +102,7 @@ func main() {
 	r.HandleFunc("/ping", func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		fmt.Println("Ping Received")
-	}).Methods(http.MethodPost)
+	}).Methods(http.MethodGet)
 
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
 		params := request.URL.Query()
