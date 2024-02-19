@@ -35,32 +35,32 @@ func init() {
 	refreshToken = os.Getenv("REFRESH_TOKEN")
 }
 func sendPing() {
-	url := "https://tredingingo.onrender.com/ping"
+	for {
+		time.Sleep(120 * time.Second)
+		url := "https://tredingingo.onrender.com/ping"
 
-	// Create a new GET request to the URL
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Fatalf("Error occurred while calling the API: %s", err.Error())
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Fatalf("Error occurred while calling the API: %s", err.Error())
+		}
+		defer resp.Body.Close() // Make sure to close the response body at the end
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Error occurred while reading the response body: %s", err.Error())
+		}
+		fmt.Println("API Response:", string(body))
+
 	}
-	defer resp.Body.Close() // Make sure to close the response body at the end
 
-	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Error occurred while reading the response body: %s", err.Error())
-	}
-
-	// Convert the body to a string and print it
-	fmt.Println("API Response:", string(body))
-	time.Sleep(120 * time.Second)
 }
 func main() {
 	mutex := sync.Mutex{}
-	go sendPing()
+
 	defer func() {
 		recover()
 	}()
-
+	go sendPing()
 	r := mux.NewRouter()
 
 	r.HandleFunc("/session", func(writer http.ResponseWriter, request *http.Request) {
