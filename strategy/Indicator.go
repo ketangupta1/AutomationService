@@ -370,7 +370,12 @@ func calculateADXDI(data []smartapigo.CandleResponse, period int) ([]float64, []
 		for i := 0; i < len(smoothedTRs); i++ {
 			plusDI := 100 * smoothedPlusDMs[i] / smoothedTRs[i]
 			minusDI := 100 * smoothedMinusDMs[i] / smoothedTRs[i]
-			dx := 100 * math.Abs(plusDI-minusDI) / (plusDI + minusDI)
+			diSum := plusDI + minusDI
+			if diSum == 0 {
+				diSum = 1
+			}
+
+			dx := 100 * math.Abs(plusDI-minusDI) / diSum
 
 			DXs = append(DXs, dx)
 			plusDIs[startIndex+period-1] = plusDI
