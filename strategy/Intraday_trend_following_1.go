@@ -37,7 +37,7 @@ func TrendFollowingStretgy(client *smartapigo.Client, db *sql.DB) {
 
 	stockList := LoadStockList(db)
 	userProfile, _ := client.GetUserProfile()
-	TrackOrders(client, "DUMMY", userProfile.UserName)
+	//TrackOrders(client, "DUMMY", userProfile.UserName)
 
 	for {
 		for _, stock := range stockList {
@@ -67,7 +67,7 @@ func Execute(symbol, stockToken string, client *smartapigo.Client, userName stri
 	var orderRes smartapigo.OrderResponse
 	orderRes, _ = client.PlaceOrder(orderParams)
 	fmt.Printf("order response %v for %v", orderRes, userName)
-	TrackOrders(client, symbol, userName)
+	//TrackOrders(client, symbol, userName)
 
 }
 
@@ -85,7 +85,7 @@ func TrendFollowingRsi(data []smartapigo.CandleResponse, token, symbol, username
 	var order ORDER
 	order.OrderType = "None"
 	fmt.Printf("\nStock Name: %v UserName %v\n", symbol, username)
-	fmt.Printf("adx = %v, sma5 = %v, sma8 = %v, sma13 = %v, sma21 = %v, rsi = %v,  name = %v ", adx14.Adx[idx], sma5, sma8, sma13, sma21, rsi[idx], username)
+	fmt.Printf("currentTime:%v, currentData:%v, adx = %v, sma5 = %v, sma8 = %v, sma13 = %v, sma21 = %v, rsi = %v,  name = %v ", time.Now(), data[idx], adx14.Adx[idx], sma5, sma8, sma13, sma21, rsi[idx], username)
 	if adx14.Adx[idx] >= 25 && adx14.PlusDi[idx] > adx14.MinusDi[idx] && sma5 > sma8 && sma8 > sma13 && sma13 > sma21 && rsi[idx] < 70 && rsi[idx] > 60 && rsi[idx-2] < rsi[idx] && rsi[idx-1] < rsi[idx] {
 		order = ORDER{
 			Spot:      data[idx].High + 0.05,
