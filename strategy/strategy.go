@@ -99,7 +99,7 @@ func (s *strategy) Algo(token string) {
 
 		// some algo....
 		candles := s.pastData
-		PopulateIndicators(candles, token)
+		PopulateIndicators(candles, token, "Dummy")
 		fmt.Printf("candels %v data %v\n", candles[len(candles)-1], float64(data.LastTradedPrice)/100.0)
 		atr := GetAtrArray(token)
 		sto := GetStoArray(token)

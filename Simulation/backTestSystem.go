@@ -24,7 +24,7 @@ type bestParams struct {
 var best bestParams
 
 func backTestSystems(data []smartapigo.CandleResponse, token string) {
-	strategy.PopulateIndicators(data, token)
+	strategy.PopulateIndicators(data, token, "")
 	strategy.SetAmount(100000)
 	values := strategy.HeikinAshi[token][len(strategy.HeikinAshi[token])-50:]
 	fmt.Printf("%v", values)
