@@ -16,6 +16,7 @@ type Movie struct {
 	DirectorName string  `json:"director_name"`
 	WriterName   string  `json:"writer_name"`
 	WriterID     string  `json:"writer_id"`
+	ImageLink    string  `json:"img_link"`
 }
 
 // dummyMovies is our sample data
@@ -36,6 +37,7 @@ var dummyMovies = []Movie{
 		DirectorName: "Frank Darabont",
 		WriterName:   "Stephen King,Frank Darabont",
 		WriterID:     "nm0000175,nm0001104",
+		ImageLink:    "https://m.media-amazon.com/images/M/MV5BMWU4N2FjNzYtNTVkNC00NzQ0LTg0MjAtYTJlMjFhNGUxZDFmXkEyXkFqcGdeQXVyNjc1NTYyMjg@._V1_QL75_UX380_CR0",
 	},
 }
 

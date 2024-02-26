@@ -37,7 +37,7 @@ func TrendFollowingStretgy(client *smartapigo.Client, db *sql.DB) {
 
 	stockList := LoadStockList(db)
 	userProfile, _ := client.GetUserProfile()
-	//TrackOrders(client, "DUMMY", userProfile.UserName)
+	TrackOrders(client, "DUMMY", userProfile.UserName)
 
 	for {
 		for _, stock := range stockList {
@@ -65,9 +65,9 @@ func Execute(symbol, stockToken string, client *smartapigo.Client, userName stri
 	orderParams := SetOrderParams(order, stockToken, symbol)
 	fmt.Printf("\norder params: for %v \n%v\n", userName, orderParams)
 	var orderRes smartapigo.OrderResponse
-	//orderRes, _ = client.PlaceOrder(orderParams)
+	orderRes, _ = client.PlaceOrder(orderParams)
 	fmt.Printf("order response %v for %v", orderRes, userName)
-	//TrackOrders(client, symbol, userName)
+	TrackOrders(client, symbol, userName)
 
 }
 
