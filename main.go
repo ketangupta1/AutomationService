@@ -104,6 +104,11 @@ func main() {
 		fmt.Println("Ping Received")
 	}).Methods(http.MethodGet)
 
+	r.HandleFunc("/movie", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		json.NewEncoder(writer).Encode(Simulation.GetMovies())
+	}).Methods(http.MethodGet)
+
 	r.HandleFunc("/candle", func(writer http.ResponseWriter, request *http.Request) {
 		params := request.URL.Query()
 		clientCode := params.Get("clientCode")

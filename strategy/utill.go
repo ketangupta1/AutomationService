@@ -326,20 +326,20 @@ func GetNextPrice(stockName string, pastData []smartapigo.CandleResponse) (float
 	return predictedPrice, nil
 }
 
-func PopulateIndicators(candles []smartapigo.CandleResponse, token string) {
+func PopulateIndicators(candles []smartapigo.CandleResponse, token, userName string) {
 	var closePrice = GetClosePriceArray(candles)
-	CalculateEma(closePrice, 9, token)
-	CalculateSma(closePrice, 9, token)
-	CalculateRsi(closePrice, 14, token)
-	CalculateAtr(candles, 14, token)
-	CalculateMACD(closePrice, 9, 26, token)
-	CalculateSto(candles, 14, token)
-	CalculateSignalLine(closePrice, 14, 9, 26, token)
-	CalculateHeikinAshi(candles, token)
-	CalculateAdx(candles, 14, token)
+	CalculateEma(closePrice, 9, userName+token)
+	CalculateSma(closePrice, 9, userName+token)
+	CalculateRsi(closePrice, 14, userName+token)
+	CalculateAtr(candles, 14, userName+token)
+	CalculateMACD(closePrice, 9, 26, userName+token)
+	CalculateSto(candles, 14, userName+token)
+	CalculateSignalLine(closePrice, 14, 9, 26, userName+token)
+	CalculateHeikinAshi(candles, userName+token)
+	CalculateAdx(candles, 14, userName+token)
 	for i := 3; i <= 30; i++ {
-		CalculateSma(closePrice, i, token+strconv.Itoa(i))
-		CalculateEma(closePrice, i, token+strconv.Itoa(i))
+		CalculateSma(closePrice, i, userName+token+strconv.Itoa(i))
+		CalculateEma(closePrice, i, userName+token+strconv.Itoa(i))
 	}
 }
 
